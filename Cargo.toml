@@ -1,0 +1,8 @@
+[package]
+name = "message_parser"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+rumqttc = "0.24.0"
+rusqlite = { version = "0.32.0", features = ["bundled"] }
