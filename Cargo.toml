@@ -1,0 +1,9 @@
+[package]
+name = "lcd-controller"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+embedded-hal = "0.2.7"
+mcp23017 = "1.1.0"
+rppal = {version = "0.22.1", features = ["embedded-hal-0"]}
