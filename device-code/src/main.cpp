@@ -14,8 +14,8 @@
 #include <PubSubClient.h>
 
 
-const char* STASSID = "B67C Hyperoptic 1Gb Fibre 2.4Ghz";
-const char* STAPSK = "S3HSJFSAaGcx";
+const char* STASSID = "";
+const char* STAPSK = "";
 const char* NTP_SERVER = "uk.pool.ntp.org";
 const char* NTP_TZ = "BST0GMT,M3.2.0/2:00:00,M11.1.0/2:00:00";
 const char* MQTT_SERVER = "rpi.local";

@@ -1,8 +1,7 @@
 # Weather Station Interfaces
 
-Defines the common interfaces for communication between the 'server' and the sensors.
-
-The MQTT payload contains a C struct as follows:
+Defines the common interfaces for communication between the Raspberry Pi and the ESP8266. They communicate over MQTT
+sending the C struct below:
 
 ```
 typedef struct SensorPayload {
@@ -18,7 +17,7 @@ typedef struct SensorPayload {
 };
 ```
 
-The database contains a single table, WeatherStation, which contains
+The SQLite database contains a single table, WeatherStation, which contains
 
 | MeasurementTime | ReceivedTime | TemperatureBME | TemperatureCCS811 | TemperatureDHT22 | PressureBME | HumidityBME | HumidityDHT22 | eCO2CCS811 | TVOCCCS811 |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
