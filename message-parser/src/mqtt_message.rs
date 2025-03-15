@@ -1,6 +1,5 @@
 use core::ffi;
 
-
 #[repr(C)]
 #[allow(non_snake_case)]
 pub struct SensorPayload {
@@ -16,8 +15,10 @@ pub struct SensorPayload {
 }
 
 impl SensorPayload {
-    pub fn to_sql_tuple(&self, received_time: i64)
-    -> (i64, i64, i32, i32, i32, i32, i32, i32, i32, i32) {
+    pub fn to_sql_tuple(
+        &self,
+        received_time: i64,
+    ) -> (i64, i64, i32, i32, i32, i32, i32, i32, i32, i32) {
         (
             self.posix_time,
             received_time,
@@ -31,5 +32,18 @@ impl SensorPayload {
             self.ccs811_TVOC as i32,
         )
     }
-}
 
+    pub const fn create_dummy() -> Self {
+        Self {
+            posix_time: 1742069972,
+            bme_temperature: 100f32,
+            bme_pressure: 101325f32,
+            bme_humidity: 20f32,
+            ccs811_temperature: 90f32,
+            ccs811_eCO2: 450,
+            ccs811_TVOC: 25,
+            dht22_temperature: 95f32,
+            dht22_humidity: 20f32,
+        }
+    }
+}
