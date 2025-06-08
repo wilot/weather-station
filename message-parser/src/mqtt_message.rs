@@ -30,7 +30,7 @@ impl SensorMessage {
         // TODO: Validate data size first
 
         let mut cursor = Cursor::new(data);
-        Ok(SensorMessage {
+        let message = SensorMessage {
             header: SensorMessageHeader {
                 magic_number: cursor.read_u32::<LittleEndian>()?,
             },
@@ -45,7 +45,12 @@ impl SensorMessage {
                 dht22_temperature: cursor.read_f32::<LittleEndian>()?,
                 dht22_humidity: cursor.read_f32::<LittleEndian>()?,
             },
-        })
+        };
+
+        match message.header.magic_number {
+            0x12345678 => Ok(message),
+            val => panic!("Magic number error: {:#06x}", val),
+        }
     }
 }
 

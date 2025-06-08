@@ -80,7 +80,7 @@ pub fn insert_sensor_data(conn: &Connection, payload: &SensorMessagePayload) -> 
 
 // Inserts a dummy record into the test table
 pub fn insert_test_record(conn: &Connection) -> Result<()> {
-    let dummy_payload = SensorPayload::create_dummy();
+    let dummy_payload = SensorMessagePayload::create_dummy();
 
     let received_time = SystemTime::now()
         .duration_since(UNIX_EPOCH)

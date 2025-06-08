@@ -1,6 +1,5 @@
 use crate::database::{create_tables, insert_sensor_data, insert_test_record};
 use crate::mqtt_message::SensorMessage;
-use core::ptr::read;
 use rumqttc::{Client, Event, MqttOptions, Packet, QoS};
 use rusqlite::Connection;
 use std::env;
