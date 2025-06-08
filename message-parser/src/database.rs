@@ -1,4 +1,4 @@
-use crate::mqtt_message::SensorPayload;
+use crate::mqtt_message::SensorMessagePayload;
 use rusqlite::{Connection, Result};
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -68,7 +68,7 @@ pub fn create_tables(conn: &Connection) -> Result<()> {
 /// Inserts sensor data into the 'weather_data' table.
 ///
 /// Reformats the SensorPayload and adds the current POSIX time.
-pub fn insert_sensor_data(conn: &Connection, payload: &SensorPayload) -> Result<()> {
+pub fn insert_sensor_data(conn: &Connection, payload: &SensorMessagePayload) -> Result<()> {
     let received_time = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .expect("System time predates unix epoch???")

@@ -3,6 +3,7 @@
 #include <Wire.h>
 #include <SPI.h>
 #include <ESP8266WiFi.h>
+#include <cstdint>
 #include <time.h>
 #include <coredecls.h>
 
@@ -29,23 +30,40 @@ Adafruit_CCS811 ccs;
 DHT_Unified dht(4, DHT22);  // Use GPIO pin 4
 
 WiFiClient mqttSocket;
-PubSubClient mqttClient(mqttSocket);
-String mqttCLientId = "WeatherStation";
+PubSubClient mqttClient(MQTT_SERVER, 1883, mqttSocket);
+const char* mqttCLientId = "WeatherStation";
 
-typedef struct SensorPayload {
+typedef struct __attribute__((packed)) sensor_message_header_t {
+  uint32_t magic_value;
+} SensorMessageHeader;
+
+typedef struct __attribute__((packed)) sensor_payload_t {
+  int64_t posix_time;
   float bmeTemperature;
   float bmePressure;
   float bmeHumidity;
   float ccs811Temperature;
-  uint16 ccs811eCO2;  // in ppm
-  uint16 ccs811TVOC;  // in ppb
+  uint16_t ccs811eCO2;  // in ppm
+  uint16_t ccs811TVOC;  // in ppb
   float DHT22Temperature;
   float DHT22Humidity;
-};
+} SensorPayload;
+
+typedef struct __attribute__((packed)) message_t {
+  SensorMessageHeader header;
+  SensorPayload payload;
+} SensorMessage;
 
 // Set the update timer for NTP
 uint32_t sntp_update_delay_MS_rfc_not_less_than_15000 () {
   return 5 * 60 * 1000UL; // 5 min
+}
+
+// Fetches the current posix time
+int64_t get_posix_time() {
+  time_t now;
+  time(&now);
+  return (int64_t) now;
 }
 
 // Print the time
@@ -54,6 +72,10 @@ void print_time() {
   tm time_struct;
   time(&now);                       // read the current time
   localtime_r(&now, &time_struct);           // update the structure tm with the current time
+
+  Serial.print("POSIX time: ");
+  Serial.println((int64_t) now);
+
   Serial.print("year:");
   Serial.print(time_struct.tm_year + 1900);  // years since 1900
   Serial.print("\tmonth:");
@@ -79,7 +101,6 @@ void print_time() {
 void time_set(bool from_sntp){
   Serial.print(F("Time was set from_sntp=")); Serial.println(from_sntp);
 }
-
 
 /*!
  * @brief Takes measurements from every sensor and prints to serial
@@ -136,23 +157,24 @@ void measure_print_sensors() {
 }
 
 
-bool connectMQTT() {
-  Serial.print("Connecting to MQTT server... ");
-  if (mqttClient.connect(mqttCLientId.c_str())) {
-    Serial.println("connected.");
-  } else {
-    Serial.print("connection failed; rc=");
+/*!
+ * @brief Initialises the MQTT client, looping until success...
+*/
+void initialise_mqtt(){
+  Serial.println("Connecting to MQTT server");
+  while(!mqttClient.connect(mqttCLientId, NULL, NULL)){
+    Serial.print("Connection failed with state ");
     Serial.println(mqttClient.state());
+    yield();
   }
-  return mqttClient.connected();
+  Serial.println("Connected to MQTT server");
 }
 
 
 /*!
- * @brief Sets up Serial, NTP, WiFi, randomSeed and connects to MQTT
- * @returns True on success, false otherwise
+ * @brief Sets up Serial, NTP, WiFi, randomSeed
  */
-bool initialise_esp() {
+void initialise_esp() {
 
   // Initialise Serial & LED
   pinMode(LED_BUILTIN, OUTPUT);
@@ -175,8 +197,6 @@ bool initialise_esp() {
   Serial.println("\nWiFi connected\n");
 
   randomSeed(micros());  // Use the time to connect as a source of entropy
-
-  return connectMQTT();
 }
 
 
@@ -214,7 +234,9 @@ bool initialise_sensors() {
     Serial.println("Failed to start CCS811 sensor!");
     return false;
   }
-  while(!ccs.available());  // Wait
+  while(!ccs.available()){
+    yield();
+  }
   float measured_temperature = ccs.calculateTemperature();
   ccs.setTempOffset(measured_temperature - dht_temperature.temperature);  // Calibrate CCS811 with current temperature from DHT22
 
@@ -254,16 +276,16 @@ SensorPayload measure_sensors() {
     payload.DHT22Humidity = dht_measurement.relative_humidity;
   }
 
+  payload.posix_time = get_posix_time();
+
   return payload;
 }
 
 
 void setup() {
   initialise_esp();
-  if (!initialise_sensors()) {
-    Serial.println(F("ERROR INITIALISING SENSORS"));
-    while(true);
-  } 
+  initialise_mqtt();
+  initialise_sensors();
 }
 
 void loop() {
@@ -273,16 +295,19 @@ void loop() {
   Serial.println("Estimated time:");
   print_time();
 
+  // for debugging
   measure_print_sensors();
 
-  SensorPayload sensor_values = measure_sensors();
-  if (!mqttClient.connected()) {
-    Serial.println("MQTT client not connected");
-    connectMQTT();  // Just assumeit worked this time I guess...
-  }
-  mqttClient.publish("TEST", (byte*)&sensor_values, sizeof(sensor_values));
+  const SensorMessageHeader sensor_header = {0x12345678};
+  const SensorPayload sensor_values = measure_sensors();
+  const SensorMessage sensor_message = {sensor_header, sensor_values};
+
+  mqttClient.publish("weather/test", (byte*)&sensor_message, sizeof(sensor_message));
 
   Serial.println(F("\n------------------------------------\n"));
-  mqttClient.loop();
+  if(!mqttClient.loop()){
+    Serial.println("Lost connection to the MQTT server, reconnecting");
+    initialise_mqtt();
+  }
   delay(10000);
 }

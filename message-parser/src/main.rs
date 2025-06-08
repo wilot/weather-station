@@ -1,5 +1,5 @@
 use crate::database::{create_tables, insert_sensor_data, insert_test_record};
-use crate::mqtt_message::SensorPayload;
+use crate::mqtt_message::SensorMessage;
 use core::ptr::read;
 use rumqttc::{Client, Event, MqttOptions, Packet, QoS};
 use rusqlite::Connection;
@@ -14,10 +14,16 @@ const DATABASE_PATH: &str = "database.db";
 ///
 /// Reads the reformats the payload for the database and inserts it to the database.
 fn on_message(payload: &[u8]) {
-    // TODO: Consider using `bytemuck` to do this safely!
-    let sensor_payload: SensorPayload = unsafe { read(payload.as_ptr() as *const SensorPayload) };
+    let sensor_message = match SensorMessage::from_bytes(payload) {
+        Ok(message) => message,
+        Err(error) => {
+            println!("Error parsing message bytes: {}", error);
+            return;
+        }
+    };
+
     let conn = get_database_connection();
-    insert_sensor_data(&conn, &sensor_payload)
+    insert_sensor_data(&conn, &(sensor_message.payload))
         .expect("Failed to insert sensor payload into database.");
 }
 
@@ -53,7 +59,7 @@ fn main() {
 
     // Subscribe to the MQTT channel
     mqtt_client
-        .subscribe("WeatherStation", QoS::AtMostOnce)
+        .subscribe("weather/station", QoS::AtMostOnce)
         .expect("Couldn't subscribe to 'WeatherStation'");
 
     for notification in mqtt_connection.iter() {

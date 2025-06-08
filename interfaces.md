@@ -4,17 +4,25 @@ Defines the common interfaces for communication between the Raspberry Pi and the
 sending the C struct below:
 
 ```
-typedef struct SensorPayload {
-    time_t posix_time;  // signed long long
-    float bmeTemperature;
-    float bmePressure;
-    float bmeHumidity;
-    float ccs811Temperature;
-    uint16 ccs811eCO2;  // in ppm
-    uint16 ccs811TVOC;  // in ppb
-    float DHT22Temperature;
-    float DHT22Humidity;
-};
+typedef struct __attribute__((packed)) sensor_message_header_t {
+  uint32_t magic_value;
+} SensorMessageHeader;
+
+typedef struct __attribute__((packed)) sensor_payload_t {
+  float bmeTemperature;
+  float bmePressure;
+  float bmeHumidity;
+  float ccs811Temperature;
+  uint16_t ccs811eCO2;  // in ppm
+  uint16_t ccs811TVOC;  // in ppb
+  float DHT22Temperature;
+  float DHT22Humidity;
+} SensorPayload;
+
+typedef struct __attribute__((packed)) message_t {
+  SensorMessageHeader header;
+  SensorPayload payload;
+} SensorMessage;
 ```
 
 The SQLite database contains a single table, WeatherStation, which contains
