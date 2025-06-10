@@ -1,7 +1,6 @@
-use crate::database::{create_tables, insert_sensor_data, insert_test_record};
+use crate::database::WeatherDatabase;
 use crate::mqtt_message::SensorMessage;
 use rumqttc::{Client, Event, MqttOptions, Packet, QoS};
-use rusqlite::Connection;
 use std::env;
 
 mod database;
@@ -16,39 +15,52 @@ fn on_message(payload: &[u8]) {
     let sensor_message = match SensorMessage::from_bytes(payload) {
         Ok(message) => message,
         Err(error) => {
-            println!("Error parsing message bytes: {}", error);
+            eprintln!("Error parsing message bytes: {}", error);
             return;
         }
     };
 
-    let conn = get_database_connection();
-    insert_sensor_data(&conn, &(sensor_message.payload))
-        .expect("Failed to insert sensor payload into database.");
-}
+    let database_conn = match WeatherDatabase::new(DATABASE_PATH) {
+        Ok(conn) => conn,
+        Err(error) => {
+            eprintln!("Error connecting to database `on_message`: {}", error);
+            return;
+        }
+    };
 
-fn get_database_connection() -> Connection {
-    let conn = Connection::open(DATABASE_PATH); // Implicitly creates if not found
-    conn.expect("Failed to connect to the database!")
+    database_conn
+        .insert_sensor_data(&sensor_message.payload)
+        .unwrap_or_else(|err| eprintln!("Failed to insert sensor payload into database: {}", err));
 }
 
 fn test_database() {
-    let conn = get_database_connection();
-    insert_test_record(&conn).expect("Database test failed!");
+    let database_conn = match WeatherDatabase::new(DATABASE_PATH) {
+        Ok(conn) => conn,
+        Err(error) => {
+            eprintln!("Error connecting to database for test: {}", error);
+            return;
+        }
+    };
+    database_conn
+        .test_sqlite()
+        .unwrap_or_else(|err| eprintln!("Database test failed: {}", err));
 }
 
 fn main() {
-    // Set up database
-    {
-        let conn = get_database_connection();
-        create_tables(&conn)
-    }
-    .expect("Could not initialise database");
-
     // Connect to the MQTT server
     let options = MqttOptions::new("RpiServer", "localhost", 1883);
     let (mqtt_client, mut mqtt_connection) = Client::new(options, 10);
 
     println!("Database connection initialised and MQTT connected.");
+
+    // Verify presence of tables or create if necessary
+    WeatherDatabase::new(DATABASE_PATH)
+        .expect("Could not connect to database")
+        .create_tables()
+        .expect("Could not create or verify tables");
+
+    // Test database insert...
+    test_database();
 
     // If passed the `--setup-test` argument, setup the database and test it!
     let args: Vec<String> = env::args().collect();

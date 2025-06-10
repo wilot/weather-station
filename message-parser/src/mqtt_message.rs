@@ -49,6 +49,7 @@ impl SensorMessage {
 
         match message.header.magic_number {
             0x12345678 => Ok(message),
+            0x78563412 => panic!("Magic number error, looks like wrong endiness: 0x78563412"),
             val => panic!("Magic number error: {:#06x}", val),
         }
     }
