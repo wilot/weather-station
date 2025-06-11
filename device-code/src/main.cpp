@@ -1,3 +1,4 @@
+#include "IPAddress.h"
 #include <Arduino.h>
 
 #include <Wire.h>
@@ -19,7 +20,6 @@ const char* STASSID = "";
 const char* STAPSK = "";
 const char* NTP_SERVER = "uk.pool.ntp.org";
 const char* NTP_TZ = "BST0GMT,M3.2.0/2:00:00,M11.1.0/2:00:00";
-const char* MQTT_SERVER = "rpi.local";
 
 //time_t now;
 //tm time_struct;
@@ -30,7 +30,8 @@ Adafruit_CCS811 ccs;
 DHT_Unified dht(4, DHT22);  // Use GPIO pin 4
 
 WiFiClient mqttSocket;
-PubSubClient mqttClient(MQTT_SERVER, 1883, mqttSocket);
+IPAddress mqtt_server_address(192, 168, 1, 126);
+PubSubClient mqttClient(mqtt_server_address, 1883, mqttSocket);
 const char* mqttCLientId = "WeatherStation";
 
 typedef struct __attribute__((packed)) sensor_message_header_t {
@@ -283,9 +284,14 @@ SensorPayload measure_sensors() {
 
 
 void setup() {
+  Serial.println("Startup");
   initialise_esp();
+  Serial.println("Initialised ESP8266");
   initialise_mqtt();
+  Serial.println("Initialised MQTT connection");
   initialise_sensors();
+  Serial.println("Sensors set up");
+  Serial.println("Initialisation complete\n");
 }
 
 void loop() {
