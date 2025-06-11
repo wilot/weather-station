@@ -59,13 +59,11 @@ fn main() {
         .create_tables()
         .expect("Could not create or verify tables");
 
-    // Test database insert...
-    test_database();
-
     // If passed the `--setup-test` argument, setup the database and test it!
     let args: Vec<String> = env::args().collect();
     if args.len() > 1 && args[1] == "--setup-test" {
         test_database();
+        println!("Tests successful");
     }
 
     // Subscribe to the MQTT channel
