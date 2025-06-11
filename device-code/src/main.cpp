@@ -308,7 +308,10 @@ void loop() {
   const SensorPayload sensor_values = measure_sensors();
   const SensorMessage sensor_message = {sensor_header, sensor_values};
 
-  mqttClient.publish("weather/test", (byte*)&sensor_message, sizeof(sensor_message));
+  bool publish_success = mqttClient.publish("weather/test", (byte*)&sensor_message, sizeof(sensor_message));
+  if(!publish_success){
+    Serial.println("MQTT publish unsuccessful");
+  }
 
   Serial.println(F("\n------------------------------------\n"));
   if(!mqttClient.loop()){

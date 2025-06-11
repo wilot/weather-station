@@ -77,7 +77,7 @@ fn main() {
                 // let topic = pub_packet.topic;  // All topic should be WeatherStation...
                 on_message(&pub_packet.payload);
             }
-            Ok(packet) => println!("Misc MQTT event: {:?}", packet),
+            Ok(_) => {}
             Err(conn_err) => println!("Connection error: {:?}", conn_err),
         };
     }
