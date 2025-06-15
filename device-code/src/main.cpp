@@ -1,9 +1,10 @@
-#include "IPAddress.h"
 #include <Arduino.h>
 
 #include <Wire.h>
 #include <SPI.h>
 #include <ESP8266WiFi.h>
+#include "IPAddress.h"
+#include "user_interface.h"
 #include <cstdint>
 #include <time.h>
 #include <coredecls.h>
@@ -20,6 +21,7 @@ const char* STASSID = "";
 const char* STAPSK = "";
 const char* NTP_SERVER = "uk.pool.ntp.org";
 const char* NTP_TZ = "BST0GMT,M3.2.0/2:00:00,M11.1.0/2:00:00";
+const uint64_t DEEPSLEEP_TIME = 6E8;
 
 //time_t now;
 //tm time_struct;
@@ -159,16 +161,23 @@ void measure_print_sensors() {
 
 
 /*!
- * @brief Initialises the MQTT client, looping until success...
+ * @brief Initialises the MQTT client, return false after 5 attempts...
 */
-void initialise_mqtt(){
+bool initialise_mqtt(){
   Serial.println("Connecting to MQTT server");
-  while(!mqttClient.connect(mqttCLientId, NULL, NULL)){
+  uint8_t attempts = 0;
+  while(attempts < 5){
+    if(mqttClient.connect(mqttCLientId, NULL, NULL)){
+      Serial.println("Connected to MQTT server");
+      return true;
+    }
     Serial.print("Connection failed with state ");
     Serial.println(mqttClient.state());
+    attempts++;
     yield();
   }
-  Serial.println("Connected to MQTT server");
+  Serial.println("Giving up connecting to MQTT server.");
+  return false;
 }
 
 
@@ -227,8 +236,6 @@ bool initialise_sensors() {
   // initialise the DHT22
   dht.begin();
   Serial.println("Initialised DHT22");
-  sensors_event_t dht_temperature;
-  dht.temperature().getEvent(&dht_temperature);
 
   // initialise the CCS811
   if (!ccs.begin(CCS811_ADDRESS)){
@@ -238,8 +245,10 @@ bool initialise_sensors() {
   while(!ccs.available()){
     yield();
   }
-  float measured_temperature = ccs.calculateTemperature();
-  ccs.setTempOffset(measured_temperature - dht_temperature.temperature);  // Calibrate CCS811 with current temperature from DHT22
+  bme.takeForcedMeasurement();
+  float measured_temperature = bme.readTemperature();
+  float measured_humidity = bme.readHumidity();
+  ccs.setEnvironmentalData(measured_humidity, measured_temperature);
 
   return true;
 }
@@ -260,6 +269,7 @@ SensorPayload measure_sensors() {
   payload.bmePressure = bme.readPressure();  // in Pa
 
   // CCS811 measurement
+  ccs.setEnvironmentalData(payload.bmeHumidity, payload.bmeTemperature);
   payload.ccs811Temperature = ccs.calculateTemperature();
   if (!ccs.readData()) {
     payload.ccs811eCO2 = ccs.geteCO2();
@@ -283,26 +293,38 @@ SensorPayload measure_sensors() {
 }
 
 
+// Sets the ESP to deepsleep, reawakening RF on restart
+void start_sleep(){
+  uint64_t max_sleep_time = ESP.deepSleepMax();
+  uint64_t sleep_time = min(max_sleep_time, DEEPSLEEP_TIME);
+  Serial.print("Sleeping for ");
+  Serial.print(sleep_time / 1E6);
+  Serial.print("s (max ");
+  Serial.print(max_sleep_time / 1E6);
+  Serial.println("s");
+  ESP.deepSleep(sleep_time, WAKE_RF_DEFAULT);
+}
+
+
 void setup() {
+
   Serial.println("Startup");
   initialise_esp();
   Serial.println("Initialised ESP8266");
-  initialise_mqtt();
+  if(!initialise_mqtt()){
+    Serial.println("Reattempt MQTT connection on next cycle");
+    start_sleep();
+  }
   Serial.println("Initialised MQTT connection");
   initialise_sensors();
   Serial.println("Sensors set up");
   Serial.println("Initialisation complete\n");
-}
-
-void loop() {
-
-  digitalWrite(LED_BUILTIN, !digitalRead(LED_BUILTIN));  // Flip the LED
 
   Serial.println("Estimated time:");
   print_time();
 
   // for debugging
-  measure_print_sensors();
+  // measure_print_sensors();
 
   const SensorMessageHeader sensor_header = {0x12345678};
   const SensorPayload sensor_values = measure_sensors();
@@ -314,9 +336,32 @@ void loop() {
   }
 
   Serial.println(F("\n------------------------------------\n"));
-  if(!mqttClient.loop()){
-    Serial.println("Lost connection to the MQTT server, reconnecting");
-    initialise_mqtt();
-  }
-  delay(10000);
+  start_sleep();
+}
+
+void loop() {
+
+  /*digitalWrite(LED_BUILTIN, !digitalRead(LED_BUILTIN));  // Flip the LED*/
+  /**/
+  /*Serial.println("Estimated time:");*/
+  /*print_time();*/
+  /**/
+  /*// for debugging*/
+  /*// measure_print_sensors();*/
+  /**/
+  /*const SensorMessageHeader sensor_header = {0x12345678};*/
+  /*const SensorPayload sensor_values = measure_sensors();*/
+  /*const SensorMessage sensor_message = {sensor_header, sensor_values};*/
+  /**/
+  /*bool publish_success = mqttClient.publish("weather/test", (byte*)&sensor_message, sizeof(sensor_message));*/
+  /*if(!publish_success){*/
+  /*  Serial.println("MQTT publish unsuccessful");*/
+  /*}*/
+  /**/
+  /*Serial.println(F("\n------------------------------------\n"));*/
+  /*if(!mqttClient.loop()){*/
+  /*  Serial.println("Lost connection to the MQTT server, reconnecting");*/
+  /*  initialise_mqtt();*/
+  /*}*/
+  /*delay(10000);*/
 }
