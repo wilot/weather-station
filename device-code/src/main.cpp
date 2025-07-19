@@ -21,7 +21,7 @@ const char* STASSID = "";
 const char* STAPSK = "";
 const char* NTP_SERVER = "uk.pool.ntp.org";
 const char* NTP_TZ = "BST0GMT,M3.2.0/2:00:00,M11.1.0/2:00:00";
-const uint64_t DEEPSLEEP_TIME = 6E8;
+const uint64_t DEEPSLEEP_TIME = 6E8;  // in us, equal to 10 mins
 
 //time_t now;
 //tm time_struct;
@@ -301,7 +301,7 @@ void start_sleep(){
   Serial.print(sleep_time / 1E6);
   Serial.print("s (max ");
   Serial.print(max_sleep_time / 1E6);
-  Serial.println("s");
+  Serial.println("s)");
   ESP.deepSleep(sleep_time, WAKE_RF_DEFAULT);
 }
 
@@ -326,7 +326,7 @@ void setup() {
   // for debugging
   // measure_print_sensors();
 
-  const SensorMessageHeader sensor_header = {0x12345678};
+  const SensorMessageHeader sensor_header = {0x12345678};  // A magic word
   const SensorPayload sensor_values = measure_sensors();
   const SensorMessage sensor_message = {sensor_header, sensor_values};
 
