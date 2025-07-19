@@ -16,7 +16,6 @@
 
 #include <PubSubClient.h>
 
-
 const char* STASSID = "";
 const char* STAPSK = "";
 const char* NTP_SERVER = "uk.pool.ntp.org";
@@ -334,6 +333,7 @@ void setup() {
   if(!publish_success){
     Serial.println("MQTT publish unsuccessful");
   }
+  yield();  // Without this, the message isn't actually sent before sleep!
 
   Serial.println(F("\n------------------------------------\n"));
   start_sleep();
