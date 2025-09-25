@@ -4,13 +4,14 @@
 #include <SPI.h>
 #include <ESP8266WiFi.h>
 #include "IPAddress.h"
+#include "pins_arduino.h"
 #include "user_interface.h"
 #include <cstdint>
 #include <time.h>
 #include <coredecls.h>
 
 #include <Adafruit_BME280.h>
-#include <Adafruit_CCS811.h>
+#include <Adafruit_SGP30.h>
 #include <DHT.h>
 #include <DHT_U.h>
 
@@ -27,7 +28,7 @@ const uint64_t DEEPSLEEP_TIME = 6E8;  // in us, equal to 10 mins
 
 Adafruit_BME280 bme;  // Use I2C interface
 //Adafruit_BME280_Humidity bme_humidity(&bme);  // Unified Sensor way of accessing humidity
-Adafruit_CCS811 ccs;
+Adafruit_SGP30 sgp;
 DHT_Unified dht(4, DHT22);  // Use GPIO pin 4
 
 WiFiClient mqttSocket;
@@ -44,9 +45,8 @@ typedef struct __attribute__((packed)) sensor_payload_t {
   float bmeTemperature;
   float bmePressure;
   float bmeHumidity;
-  float ccs811Temperature;
-  uint16_t ccs811eCO2;  // in ppm
-  uint16_t ccs811TVOC;  // in ppb
+  uint16_t eCO2;  // in ppm
+  uint16_t TVOC;  // in ppb
   float DHT22Temperature;
   float DHT22Humidity;
 } SensorPayload;
@@ -66,6 +66,13 @@ int64_t get_posix_time() {
   time_t now;
   time(&now);
   return (int64_t) now;
+}
+
+/// Calculate absolute from relative humidity
+uint32_t getAbsoluteHumidity(float temperature, float humidity) {
+    const float absoluteHumidity = 216.7f * ((humidity / 100.0f) * 6.112f * exp((17.62f * temperature) / (243.12f + temperature)) / (273.15f + temperature)); // [g/m^3]
+    const uint32_t absoluteHumidityScaled = static_cast<uint32_t>(1000.0f * absoluteHumidity); // [mg/m^3]
+    return absoluteHumidityScaled;
 }
 
 // Print the time
@@ -120,20 +127,12 @@ void measure_print_sensors() {
   Serial.print(bme.readHumidity());
   Serial.println(" %");
 
-  // measure & print CCS811 sensor balues
-  float temp = ccs.calculateTemperature();
-  if(!ccs.readData()){
-    float eCO2 = ccs.geteCO2();
-    float TVOC = ccs.getTVOC();
-
-    Serial.print("eCO2: ");
-    Serial.print(eCO2);
-    Serial.print(" ppm, TVOC: ");
-    Serial.print(TVOC);
-    Serial.print(" ppb, Temp: ");
-    Serial.println(temp);
+  // measure & print SGP30 sensor values
+  if(!sgp.IAQmeasure()){
+    Serial.println("Unable to read from SGP 30 sensor.");
   } else {
-    Serial.println("Error reading measurements from CCS811");
+    Serial.print("TVOC "); Serial.print(sgp.TVOC); Serial.print(" ppb\t");
+    Serial.print("eCO2 "); Serial.print(sgp.eCO2); Serial.println(" ppm");
   }
 
   sensors_event_t dht_event;
@@ -186,7 +185,6 @@ bool initialise_mqtt(){
 void initialise_esp() {
 
   // Initialise Serial & LED
-  pinMode(LED_BUILTIN, OUTPUT);
   Serial.begin(115200);
   Serial.println("NTP Attempt");
 
@@ -196,7 +194,7 @@ void initialise_esp() {
   yield();  // settimeofday_cb is always deferred to next yield/delay, it's not immediate!
 
   // Initialise WiFi
-  WiFi.persistent(false);
+  /*WiFi.persistent(false);*/
   WiFi.mode(WIFI_STA);
   WiFi.begin(STASSID, STAPSK);
   while (WiFi.status() != WL_CONNECTED){
@@ -236,18 +234,11 @@ bool initialise_sensors() {
   dht.begin();
   Serial.println("Initialised DHT22");
 
-  // initialise the CCS811
-  if (!ccs.begin(CCS811_ADDRESS)){
-    Serial.println("Failed to start CCS811 sensor!");
+  // initialise the SGP 30
+  if(!sgp.begin()){
+    Serial.println("Could not connect to SGP 30 sensor");
     return false;
   }
-  while(!ccs.available()){
-    yield();
-  }
-  bme.takeForcedMeasurement();
-  float measured_temperature = bme.readTemperature();
-  float measured_humidity = bme.readHumidity();
-  ccs.setEnvironmentalData(measured_humidity, measured_temperature);
 
   return true;
 }
@@ -267,12 +258,14 @@ SensorPayload measure_sensors() {
   payload.bmeHumidity = bme.readHumidity();  // in %
   payload.bmePressure = bme.readPressure();  // in Pa
 
-  // CCS811 measurement
-  ccs.setEnvironmentalData(payload.bmeHumidity, payload.bmeTemperature);
-  payload.ccs811Temperature = ccs.calculateTemperature();
-  if (!ccs.readData()) {
-    payload.ccs811eCO2 = ccs.geteCO2();
-    payload.ccs811TVOC = ccs.getTVOC();
+  // SGP30 measurement
+  sgp.setHumidity(getAbsoluteHumidity(payload.bmeTemperature, payload.bmeHumidity));
+  if(!sgp.IAQmeasure()){
+    payload.eCO2 = 0;
+    payload.TVOC = 0;
+  } else {
+    payload.eCO2 = sgp.eCO2;
+    payload.TVOC = sgp.TVOC;
   }
 
   // DHT22 measurement
@@ -309,13 +302,18 @@ void setup() {
 
   Serial.println("Startup");
   initialise_esp();
+  yield();
+  pinMode(LED_BUILTIN, OUTPUT);
+  digitalWrite(LED_BUILTIN, HIGH);
   Serial.println("Initialised ESP8266");
   if(!initialise_mqtt()){
     Serial.println("Reattempt MQTT connection on next cycle");
     start_sleep();
   }
+  yield();
   Serial.println("Initialised MQTT connection");
   initialise_sensors();
+  yield();
   Serial.println("Sensors set up");
   Serial.println("Initialisation complete\n");
 
@@ -328,12 +326,21 @@ void setup() {
   const SensorMessageHeader sensor_header = {0x12345678};  // A magic word
   const SensorPayload sensor_values = measure_sensors();
   const SensorMessage sensor_message = {sensor_header, sensor_values};
+  Serial.print("eCO2 value: ");
+  Serial.println(sensor_values.eCO2);
+  Serial.print("TVOC value: ");
+  Serial.println(sensor_values.TVOC);
+  Serial.print("Error value: ");
+
+  yield();
 
   bool publish_success = mqttClient.publish("weather/test", (byte*)&sensor_message, sizeof(sensor_message));
   if(!publish_success){
     Serial.println("MQTT publish unsuccessful");
   }
+
   yield();  // Without this, the message isn't actually sent before sleep!
+  digitalWrite(LED_BUILTIN, LOW);
 
   Serial.println(F("\n------------------------------------\n"));
   start_sleep();
