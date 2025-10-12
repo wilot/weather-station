@@ -12,9 +12,8 @@ pub struct SensorMessagePayload {
     bme_temperature: f32,
     bme_pressure: f32,
     bme_humidity: f32,
-    ccs811_temperature: f32,
-    ccs811_eCO2: u16,
-    ccs811_TVOC: u16,
+    sgp30_eCO2: u16,
+    sgp30_TVOC: u16,
     dht22_temperature: f32,
     dht22_humidity: f32,
 }
@@ -39,9 +38,8 @@ impl SensorMessage {
                 bme_temperature: cursor.read_f32::<LittleEndian>()?,
                 bme_pressure: cursor.read_f32::<LittleEndian>()?,
                 bme_humidity: cursor.read_f32::<LittleEndian>()?,
-                ccs811_temperature: cursor.read_f32::<LittleEndian>()?,
-                ccs811_eCO2: cursor.read_u16::<LittleEndian>()?,
-                ccs811_TVOC: cursor.read_u16::<LittleEndian>()?,
+                sgp30_eCO2: cursor.read_u16::<LittleEndian>()?,
+                sgp30_TVOC: cursor.read_u16::<LittleEndian>()?,
                 dht22_temperature: cursor.read_f32::<LittleEndian>()?,
                 dht22_humidity: cursor.read_f32::<LittleEndian>()?,
             },
@@ -59,18 +57,17 @@ impl SensorMessagePayload {
     pub fn to_sql_tuple(
         &self,
         received_time: i64,
-    ) -> (i64, i64, i32, i32, i32, i32, i32, i32, i32, i32) {
+    ) -> (i64, i64, i32, i32, i32, i32, i32, i32, i32) {
         (
             self.posix_time,
             received_time,
             (self.bme_temperature * 10.0) as i32,
-            (self.ccs811_temperature * 10.0) as i32,
             (self.dht22_temperature * 10.0) as i32,
             self.bme_pressure as i32,
             (self.bme_humidity * 100.0) as i32,
             (self.dht22_humidity * 100.0) as i32,
-            self.ccs811_eCO2 as i32,
-            self.ccs811_TVOC as i32,
+            self.sgp30_eCO2 as i32,
+            self.sgp30_TVOC as i32,
         )
     }
 
@@ -80,9 +77,8 @@ impl SensorMessagePayload {
             bme_temperature: 100f32,
             bme_pressure: 101325f32,
             bme_humidity: 20f32,
-            ccs811_temperature: 90f32,
-            ccs811_eCO2: 450,
-            ccs811_TVOC: 25,
+            sgp30_eCO2: 450,
+            sgp30_TVOC: 25,
             dht22_temperature: 95f32,
             dht22_humidity: 20f32,
         }

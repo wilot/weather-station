@@ -6,38 +6,36 @@ const CREATE_SQL: &str = "CREATE TABLE weather_data (
 MeasurementTime INTEGER,
 ReceivedTime INTEGER,
 TemperatureBME INTEGER,
-TemperatureCCS811 INTEGER,
 TemperatureDHT22 INTEGER,
 PressureBME INTEGER,
 HumidityBME INTEGER,
 HumidityDHT22 INTEGER,
-eCO2CCS811 INTEGER,
-TVOCCCS811 INTEGER
+eCO2SGP30 INTEGER,
+TVOCSGP30 INTEGER
 )";
 
 const INSERT_SQL: &str = "INSERT INTO weather_data (
-    MeasurementTime, ReceivedTime, TemperatureBME, TemperatureCCS811,
-    TemperatureDHT22, PressureBME, HumidityBME, HumidityDHT22, eCO2CCS811,
-    TVOCCCS811
+    MeasurementTime, ReceivedTime, TemperatureBME,
+    TemperatureDHT22, PressureBME, HumidityBME, HumidityDHT22, eCO2SGP30,
+    TVOCSGP30
 ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)";
 
 const CREATE_SQL_TEST: &str = "CREATE TABLE test_weather_data (
 MeasurementTime INTEGER,
 ReceivedTime INTEGER,
 TemperatureBME INTEGER,
-TemperatureCCS811 INTEGER,
 TemperatureDHT22 INTEGER,
 PressureBME INTEGER,
 HumidityBME INTEGER,
 HumidityDHT22 INTEGER,
-eCO2CCS811 INTEGER,
-TVOCCCS811 INTEGER
+eCO2SGP30 INTEGER,
+TVOCSGP30 INTEGER
 )";
 
 const INSERT_SQL_TEST: &str = "INSERT INTO test_weather_data (
-    MeasurementTime, ReceivedTime, TemperatureBME, TemperatureCCS811,
-    TemperatureDHT22, PressureBME, HumidityBME, HumidityDHT22, eCO2CCS811,
-    TVOCCCS811
+    MeasurementTime, ReceivedTime, TemperatureBME,
+    TemperatureDHT22, PressureBME, HumidityBME, HumidityDHT22, eCO2SGP30,
+    TVOCSGP30
 ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)";
 
 const SELECT_SQL_TEST: &str = "SELECT * FROM test_weather_data";
